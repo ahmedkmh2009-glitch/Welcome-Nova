@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "welcome-nova"
+version = "0.1.0"
+description = "Welcome bot for Nova Market"
+authors = ["Kairov <marketnuvix@gmail.com>"]
+readme = "README.md"
+packages = [{ include = "welcome_nova" }]
+
+[tool.poetry.dependencies]
+python = "^3.13"
+discord.py = "^2.6.0"
+flask = "^2.3.3"
+pillow = "^10.0.0"
+requests = "^2.31.0"
+
+[build-system]
+requires = ["poetry-core>=1.6.0"]
+build-backend = "poetry.core.masonry.api"
