@@ -2,9 +2,7 @@
 name = "welcome-nova"
 version = "0.1.0"
 description = "Welcome bot for Nova Market"
-authors = ["Kairov <marketnuvix@gmail.com>"]
-readme = "README.md"
-packages = [{ include = "welcome_nova" }]
+authors = ["Ahmed <ahmed@example.com>"]
 
 [tool.poetry.dependencies]
 python = "^3.13"
