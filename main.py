@@ -1,88 +1,53 @@
+import os
 import discord
 from discord.ext import commands
-from flask import Flask
-from threading import Thread
 from PIL import Image, ImageDraw, ImageFont, ImageFilter
-import requests
 from io import BytesIO
-import os
 from datetime import datetime
 
-# ================== CONFIG ==================
-
+# ---------------- CONFIG ----------------
 TOKEN = os.getenv("DISCORD_TOKEN")
 GUILD_ID = int(os.getenv("GUILD_ID"))
 WELCOME_CHANNEL_ID = int(os.getenv("WELCOME_CHANNEL_ID"))
 
-# ================== FLASK ==================
+FONT = "nebula.ttf"  # fuente en el mismo nivel que main.py
 
-app = Flask("keep_alive")
-
-@app.route("/")
-def home():
-    return "Nova Market is alive"
-
-def run():
-    app.run(host="0.0.0.0", port=8080)
-
-def keep_alive():
-    Thread(target=run).start()
-
-# ================== DISCORD ==================
-
+# ---------------- BOT ----------------
 intents = discord.Intents.default()
 intents.members = True
 bot = commands.Bot(command_prefix="!", intents=intents)
 
-# ================== IMAGE (NEBULA STYLE) ==================
-
+# ---------------- IMAGE ----------------
 async def create_welcome_image(member: discord.Member):
-    user = await member.guild.fetch_member(member.id)
-
-    # Fondo (banner > avatar)
-    bg_url = user.banner.url if user.banner else (
-        user.avatar.url if user.avatar else user.default_avatar.url
-    )
-
-    bg = Image.open(BytesIO(requests.get(bg_url).content)).convert("RGBA")
-    bg = bg.resize((900, 300))
-    bg = bg.filter(ImageFilter.GaussianBlur(8))
-
-    # Overlay oscuro
-    overlay = Image.new("RGBA", bg.size, (0, 0, 0, 150))
-    bg = Image.alpha_composite(bg, overlay)
-
+    # Fondo simple oscuro con blur
+    bg = Image.new("RGBA", (900, 300), (30, 30, 30, 255))
     draw = ImageDraw.Draw(bg)
 
-    # 🟣 Barra lateral Nebula
-    bar = Image.new("RGBA", (18, 300), (182, 108, 255, 255))
+    # Barra lateral morada
+    bar = Image.new("RGBA", (26, 300), (182, 108, 255, 255))
     bg.paste(bar, (0, 0))
 
-    # Avatar redondo grande
-    avatar_url = user.avatar.url if user.avatar else user.default_avatar.url
-    avatar = Image.open(BytesIO(requests.get(avatar_url).content)).convert("RGBA")
-    avatar = avatar.resize((180, 180))
-
+    # Avatar
+    avatar_url = member.avatar.url if member.avatar else member.default_avatar.url
+    avatar_data = BytesIO(await avatar_url.read())
+    avatar = Image.open(avatar_data).convert("RGBA").resize((200, 200))
     mask = Image.new("L", avatar.size, 0)
-    ImageDraw.Draw(mask).ellipse((0, 0, 180, 180), fill=255)
-    avatar.putalpha(mask)
+    ImageDraw.Draw(mask).ellipse((0, 0, 200, 200), fill=255)
+    bg.paste(avatar, (70, 50), mask)
 
-    bg.paste(avatar, (70, 60), avatar)
+    # Texto
+    font_title = ImageFont.truetype(FONT, 46)  # nombre
+    font_sub = ImageFont.truetype(FONT, 28)    # "WELCOME!"
 
-    # Fuente Nebula
-    try:
-        font_name = ImageFont.truetype("nebula.ttf", 46)
-        font_sub = ImageFont.truetype("nebula.ttf", 28)
-    except:
-        font_name = font_sub = ImageFont.load_default()
+    draw.text((300, 100), member.display_name, font=font_title, fill="white")
+    draw.text((300, 150), "WELCOME!", font=font_sub, fill=(210, 210, 210))
 
-    draw.text((280, 110), user.display_name, font=font_name, fill="white")
-    draw.text((280, 160), "WELCOME!", font=font_sub, fill=(210, 210, 210))
+    output = BytesIO()
+    bg.save(output, format="PNG")
+    output.seek(0)
+    return output
 
-    return bg
-
-# ================== EVENTS ==================
-
+# ---------------- EVENTS ----------------
 @bot.event
 async def on_ready():
     print(f"✅ Logged in as {bot.user}")
@@ -92,34 +57,24 @@ async def on_member_join(member):
     if member.guild.id != GUILD_ID:
         return
 
-    channel = bot.get_channel(WELCOME_CHANNEL_ID)
-    if not channel:
-        return
-
-    image = await create_welcome_image(member)
-    buffer = BytesIO()
-    image.save(buffer, format="PNG")
-    buffer.seek(0)
-
-    file = discord.File(buffer, filename="welcome.png")
-
-    joined = datetime.utcnow().strftime("%B %d, %Y %I:%M %p")
+    joined_ts = int(member.joined_at.timestamp())
 
     embed = discord.Embed(
         title="Welcome System - Nova Market",
         description=(
             "**Welcome to Nova Market!**\n\n"
-            f"**| User:** {member.mention}\n"
-            f"**| Joined On:** {joined}"
+            f"| User: {member.mention}\n"
+            f"| Joined On: <t:{joined_ts}:f>"
         ),
         color=0xB66CFF
     )
 
+    image_file = await create_welcome_image(member)
+    file = discord.File(fp=image_file, filename="welcome.png")
     embed.set_image(url="attachment://welcome.png")
 
+    channel = bot.get_channel(WELCOME_CHANNEL_ID)
     await channel.send(embed=embed, file=file)
 
-# ================== START ==================
-
-keep_alive()
+# ---------------- RUN ----------------
 bot.run(TOKEN)
